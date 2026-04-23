@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { companiesAPI, interviewsAPI } from '../lib/api';
 import { Building2, Search, Target, BookOpen, ChevronRight, Loader2, Code2, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function Companies() {
   const [companies, setCompanies] = useState<any[]>([]);
