@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { motion } from 'framer-motion';
 import { problemsAPI, submissionsAPI } from '../lib/api';
+import { useAuthStore } from '../stores/authStore';
 import { getDifficultyBadge, cn, LANGUAGES } from '../lib/utils';
 import {
   Play, Send, Lightbulb, RotateCcw, CheckCircle2, XCircle,
@@ -13,6 +14,8 @@ import toast from 'react-hot-toast';
 
 export default function ProblemEditor() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const { accessToken } = useAuthStore();
   const [problem, setProblem] = useState<any>(null);
   const [code, setCode] = useState('');
   const [language, setLanguage] = useState('java');
@@ -30,13 +33,15 @@ export default function ProblemEditor() {
   useEffect(() => { loadProblem(); }, [slug]);
 
   const loadProblem = async () => {
+    if (!slug) return;
     setLoading(true);
     try {
-      const { data } = await problemsAPI.get(slug!);
-      const p = data.data;
-      setProblem(p);
-      setCode(p.solutionTemplate?.[language] || getDefaultTemplate(language));
-    } catch {
+      const { data } = await problemsAPI.get(slug);
+      setProblem(data.data);
+      if (data.data?.solutionTemplate?.[language]) {
+        setCode(data.data.solutionTemplate[language]);
+      }
+    } catch (err) {
       toast.error('Problem not found');
     } finally {
       setLoading(false);
@@ -53,6 +58,11 @@ export default function ProblemEditor() {
 
   const handleSubmit = async () => {
     if (!code.trim()) return toast.error('Write some code first!');
+    if (!accessToken) {
+      toast.error('Please log in to submit code');
+      navigate('/login');
+      return;
+    }
     setSubmitting(true);
     setTab('ai-review');
     try {
@@ -65,7 +75,7 @@ export default function ProblemEditor() {
       if (data.data.status === 'ACCEPTED') toast.success('All test cases passed! 🎉');
       else toast.error(`${data.data.status.replace(/_/g, ' ')}`);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Submission failed');
+      toast.error(err.response?.data?.message || 'Submission failed — check your code and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -333,36 +343,4 @@ function getDefaultTemplate(lang: string) {
     typescript: 'function twoSum(nums: number[], target: number): number[] {\n    // Write your solution here\n    \n}',
   };
   return templates[lang] || '// Write your solution here\n';
-}
-
-function getDemoProblem() {
-  return {
-    id: '1', title: 'Two Sum', slug: 'two-sum', difficulty: 'EASY', category: 'Arrays & Hashing',
-    description: 'Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.',
-    examples: [
-      { input: 'nums = [2,7,11,15], target = 9', output: '[0,1]', explanation: 'Because nums[0] + nums[1] == 9' },
-      { input: 'nums = [3,2,4], target = 6', output: '[1,2]' },
-    ],
-    constraints: '2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9',
-    tags: ['Array', 'Hash Table'],
-    solutionTemplate: {
-      java: 'class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        // Write your solution here\n        \n    }\n}',
-      python: 'class Solution:\n    def twoSum(self, nums, target):\n        pass',
-    },
-  };
-}
-
-function getDemoResult() {
-  return {
-    status: 'ACCEPTED', runtimeMs: 120, memoryKb: 45000, testCasesPassed: 5, totalTestCases: 5,
-    output: '✓ Test 1: Passed\n✓ Test 2: Passed\n✓ Test 3: Passed\n✓ Test 4: Passed\n✓ Test 5: Passed',
-    timeComplexityDetected: 'O(n)', spaceComplexityDetected: 'O(n)', codeQualityScore: 88,
-    aiCodeReview: {
-      correctness: 'Solution is correct using HashMap for O(n) lookup',
-      efficiency: 'Optimal single-pass approach',
-      improvements: ['Consider edge case handling', 'Add input validation'],
-      strengths: ['Clean code', 'Optimal time complexity', 'Good variable naming'],
-      overallFeedback: 'Excellent solution! Well-structured one-pass hash map approach.',
-    },
-  };
 }

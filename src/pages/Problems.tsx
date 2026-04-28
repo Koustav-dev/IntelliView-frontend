@@ -4,9 +4,21 @@ import { motion } from 'framer-motion';
 import { problemsAPI } from '../lib/api';
 import { getDifficultyBadge, cn } from '../lib/utils';
 import {
-  Search, Filter, Code2, CheckCircle2, ChevronLeft, ChevronRight,
-  Tag, Building2, Loader2,
+  Search, Code2, CheckCircle2, ChevronLeft, ChevronRight,
+  Tag, Loader2, AlertCircle,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+// Demo problems shown when backend is unavailable
+const DEMO_PROBLEMS = [
+  { id: '1', title: 'Two Sum', slug: 'two-sum', difficulty: 'EASY', category: 'Arrays & Hashing', acceptanceRate: 49.5, solved: false },
+  { id: '2', title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'EASY', category: 'Stack', acceptanceRate: 40.2, solved: false },
+  { id: '3', title: 'Reverse Linked List', slug: 'reverse-linked-list', difficulty: 'EASY', category: 'Linked List', acceptanceRate: 73.5, solved: false },
+  { id: '4', title: 'Binary Search', slug: 'binary-search', difficulty: 'EASY', category: 'Binary Search', acceptanceRate: 56.2, solved: false },
+  { id: '5', title: 'Longest Common Subsequence', slug: 'longest-common-subsequence', difficulty: 'MEDIUM', category: 'Dynamic Programming', acceptanceRate: 57.1, solved: false },
+  { id: '6', title: 'LRU Cache', slug: 'lru-cache', difficulty: 'MEDIUM', category: 'Design', acceptanceRate: 41.5, solved: false },
+  { id: '7', title: 'Median of Two Sorted Arrays', slug: 'median-of-two-sorted-arrays', difficulty: 'HARD', category: 'Binary Search', acceptanceRate: 36.8, solved: false },
+];
 
 export default function Problems() {
   const [problems, setProblems] = useState<any[]>([]);
@@ -15,20 +27,29 @@ export default function Problems() {
   const [difficulty, setDifficulty] = useState('');
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [apiError, setApiError] = useState(false);
 
   useEffect(() => { loadProblems(); }, [page, difficulty]);
 
   const loadProblems = async () => {
     setLoading(true);
+    setApiError(false);
     try {
       const params: any = { page, size: 20 };
       if (difficulty) params.difficulty = difficulty;
       if (search) params.search = search;
       const { data } = await problemsAPI.list(params);
-      setProblems(data.data.content || []);
-      setTotalPages(data.data.totalPages || 1);
-    } catch {
-      setProblems([]);
+      const content = data.data?.content || data.data || [];
+      setProblems(Array.isArray(content) ? content : []);
+      setTotalPages(data.data?.totalPages || 1);
+    } catch (err: any) {
+      console.error('Problems API error:', err);
+      setApiError(true);
+      // Show demo data so page is never completely empty
+      let filtered = DEMO_PROBLEMS;
+      if (difficulty) filtered = DEMO_PROBLEMS.filter(p => p.difficulty === difficulty);
+      setProblems(filtered);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
@@ -51,6 +72,15 @@ export default function Problems() {
           <p className="text-zinc-500 dark:text-zinc-400 mt-1">Practice and master your DSA skills</p>
         </motion.div>
 
+        {/* API error banner */}
+        {apiError && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30 flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            Backend is offline — showing demo problems. Start the backend to see live data.
+          </motion.div>
+        )}
+
         {/* Filters */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -60,7 +90,7 @@ export default function Problems() {
               onChange={(e) => setSearch(e.target.value)}
               className="input-field !pl-11" />
           </form>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {['', 'EASY', 'MEDIUM', 'HARD'].map((d) => (
               <button key={d} onClick={() => { setDifficulty(d); setPage(0); }}
                 className={cn(
@@ -92,18 +122,22 @@ export default function Problems() {
               <div className="col-span-2">Acceptance</div>
             </div>
 
-            {problems.length === 0 ? <p className="text-center py-10 text-zinc-500">No problems found.</p> : problems.map((problem, i) => (
+            {problems.length === 0 ? (
+              <div className="text-center py-16 text-zinc-500">
+                <Code2 className="w-12 h-12 mx-auto mb-3 text-zinc-300 dark:text-zinc-700" />
+                <p>No problems found. Try a different filter.</p>
+              </div>
+            ) : problems.map((problem, i) => (
               <motion.div key={problem.id || i}
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}>
                 <Link to={`/problems/${problem.slug || problem.id}`}
                   className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-4 rounded-xl hover:bg-white dark:hover:bg-surface-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 hover:shadow-sm transition-all items-center group">
                   <div className="col-span-1 hidden md:flex">
-                    {problem.solved ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                    ) : (
-                      <div className="w-5 h-5 rounded-full border-2 border-zinc-300 dark:border-zinc-600" />
-                    )}
+                    {problem.solved
+                      ? <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                      : <div className="w-5 h-5 rounded-full border-2 border-zinc-300 dark:border-zinc-600" />
+                    }
                   </div>
                   <div className="col-span-5 flex items-center gap-3">
                     <Code2 className="w-4 h-4 text-zinc-400 hidden sm:block" />
@@ -120,7 +154,7 @@ export default function Problems() {
                     </span>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-sm text-zinc-500">{problem.acceptanceRate?.toFixed(1) || '50.0'}%</span>
+                    <span className="text-sm text-zinc-500">{problem.acceptanceRate?.toFixed?.(1) || problem.acceptanceRate || '50.0'}%</span>
                   </div>
                 </Link>
               </motion.div>

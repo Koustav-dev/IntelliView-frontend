@@ -49,14 +49,19 @@ export default function BehavioralInterview() {
     if (!response.trim() || !question) return toast.error('Write your response first!');
     setSubmitting(true);
     try {
-      const { data } = await interviewsAPI.submitBehavioral({
+      const payload: any = {
         questionId: question.id,
         response: response,
-      });
+      };
+      // For AI-generated questions, also send the question text so backend can analyze without DB lookup
+      if (question.id === 'ai' || question.id === null) {
+        payload.questionText = question.question;
+      }
+      const { data } = await interviewsAPI.submitBehavioral(payload);
       setFeedback(data.data);
-      toast.success('Response analyzed!');
+      toast.success('Response analyzed! 🎯');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to submit response.');
+      toast.error(err.response?.data?.message || 'Failed to submit response. Please try again.');
     } finally {
       setSubmitting(false);
     }
